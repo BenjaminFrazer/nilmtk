@@ -74,6 +74,13 @@ class MeterGroup(Electric):
             metadata for each Appliance
         building_id : BuildingID
         """
+        # both elec_meters and appliances are loaded from building metadata
+        # the objective of this function seems to be to attach each appliance
+        # to a given meter or meter group, the individual meters are still kept
+        # accessible by index MeterGroup[1-n], but each will now have an
+        # appliance attached
+        # the appliance
+        # to the
         # Sanity checking
         assert isinstance(elec_meters, dict)
         assert isinstance(appliances, list)
@@ -101,6 +108,7 @@ class MeterGroup(Electric):
             appliance_md['dataset'] = building_id.dataset
             appliance_md['building'] = building_id.instance
             appliance = Appliance(appliance_md)
+            # BF the meters associated with a given appliance per the metadata
             meter_ids = [ElecMeterID(instance=meter_instance,
                                      building=building_id.instance,
                                      dataset=building_id.dataset)
@@ -260,8 +268,14 @@ class MeterGroup(Electric):
         elif isinstance(key, dict):
             meters = []
             for meter in self.meters:
+                # try:
+                #     if meter.appliances[0].type['type']=='fridge':
+                #         import pdb; pdb.set_trace()
+                # except:
+                #     pass
                 if meter.matches_appliances(key):
                     meters.append(meter)
+
             if len(meters) == 1:
                 return meters[0]
             elif len(meters) > 1:
@@ -695,9 +709,9 @@ class MeterGroup(Electric):
         .. note:: Different AC types will be treated separately.
         """
         # Handle kwargs
-        sample_period = kwargs.setdefault('sample_period', self.sample_period())
+        sample_period = kwargs.setdefault('sample_period', self.sample_period()) # returns max sample rate
         sections = kwargs.pop('sections', [self.get_timeframe()])
-        chunksize = kwargs.pop('chunksize', MAX_MEM_ALLOWANCE_IN_BYTES)
+        chunksize = kwargs.pop('chunksize', MAX_MEM_ALLOWANCE_IN_BYTES) #
         duration_threshold = sample_period * chunksize
         columns = pd.MultiIndex.from_tuples(
             self._convert_physical_quantity_and_ac_type_to_cols(**kwargs)['columns'],
@@ -713,8 +727,10 @@ class MeterGroup(Electric):
             return
 
         # Loop through each section to load
+        # import pdb; pdb.set_trace()
         for section in split_timeframes(sections, duration_threshold):
             kwargs['sections'] = [section]
+            # import pdb; pdb.set_trace()
             start = normalise_timestamp(section.start, freq)
             tz = None if start.tz is None else start.tz.zone
             index = pd.date_range(
@@ -722,6 +738,7 @@ class MeterGroup(Electric):
                 closed='left', freq=freq)
             chunk = combine_chunks_from_generators(
                 index, columns, self.meters, kwargs)
+            # import pdb; pdb.set_trace()
             yield chunk
 
     def _convert_physical_quantity_and_ac_type_to_cols(self, **kwargs):

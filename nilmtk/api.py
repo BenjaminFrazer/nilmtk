@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import datetime
 from IPython.display import clear_output
 
+from nilmtk.synth_dataset import Synth_DataSet
+
 
 class API():
 
@@ -205,10 +207,14 @@ class API():
         self.train_submeters = [[] for i in range(len(self.appliances))]
         for dataset in d:
             print("Loading data for ",dataset, " dataset")
-            train=DataSet(d[dataset]['path'])
+            if 'DataSet' in d[dataset]:
+                train=d[dataset]['DataSet']
+            else:
+                train=DataSet(d[dataset]['path'])
             for building in d[dataset]['buildings']:
                 print("Loading building ... ",building)
                 train.set_window(start=d[dataset]['buildings'][building]['start_time'],end=d[dataset]['buildings'][building]['end_time'])
+                # import pdb; pdb.set_trace()
                 train_df = next(train.buildings[building].elec.mains().load(physical_quantity='power', ac_type=self.power['mains'], sample_period=self.sample_period))
                 train_df = train_df[[list(train_df.columns)[0]]]
                 appliance_readings = []
@@ -244,7 +250,10 @@ class API():
         # store the test_main readings for all buildings
         for dataset in d:
             print("Loading data for ",dataset, " dataset")
-            test=DataSet(d[dataset]['path'])
+            if 'DataSet' in d[dataset]:
+                test=d[dataset]['DataSet']
+            else:
+                test=DataSet(d[dataset]['path'])
             for building in d[dataset]['buildings']:
                 test.set_window(start=d[dataset]['buildings'][building]['start_time'],end=d[dataset]['buildings'][building]['end_time'])
                 test_mains=next(test.buildings[building].elec.mains().load(physical_quantity='power', ac_type=self.power['mains'], sample_period=self.sample_period))
@@ -255,6 +264,7 @@ class API():
                     appliance_readings=[]
 
                     for appliance in self.appliances:
+                        # import pdb; pdb.set_trace()
                         test_df=next((test.buildings[building].elec[appliance].load(physical_quantity='power', ac_type=self.power['appliance'], sample_period=self.sample_period)))
                         appliance_readings.append(test_df)
                     
