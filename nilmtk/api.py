@@ -24,7 +24,7 @@ class API():
         self.train_mains = pd.DataFrame()
         self.test_submeters = []
         self.test_mains = pd.DataFrame()
-        self.gt_overall = {}
+        self.gt_overall = pd.DataFrame()
         self.pred_overall = {}
         self.classifiers=[]
         self.errors = []
@@ -43,6 +43,11 @@ class API():
         self.display_predictions = params.get('display_predictions', False)
         self.DROP_ALL_NANS = params.get("DROP_ALL_NANS", True)
         self.site_only = params.get('site_only',False)
+        self.do_store_results = params.get("do_store_results",False)
+        self.results_store_name = params.get("results_store_name",None)
+        if self.do_store_results & (self.results_store_name is None):
+            dateString = datetime.datetime.now().strftime("%d-%m-%y")
+            self.results_store_name = f"API_Results_{dateString}.hdf5"
         self.experiment()
         
 
@@ -103,6 +108,10 @@ class API():
         else:
             print ("Joint Testing for all algorithms")
             self.test_jointly(d)
+        if self.do_store_results:
+            with pd.HDFStore(self.results_store_name) as store:
+                resultsSummary = pd.concat(self.errors, keys=self.errors_keys,axis=0)
+                store["ResultsSummary"] = resultsSummary
 
     def train_chunk_wise(self, clf, d, current_epoch):
         """
@@ -272,6 +281,17 @@ class API():
                 self.test_mains = [test_mains]
                 self.storing_key = str(dataset) + "_" + str(building) 
                 self.call_predict(self.classifiers, test.metadata["timezone"])
+                if self.do_store_results:
+                    # pred_overall is a dict keyed with each appliance type so we need to read this into a multi index df
+                    pred_df = pd.concat(self.pred_overall.values(),axis=1,keys=self.pred_overall.keys())
+                    self.gt_overall.columns = pd.MultiIndex.from_tuples([("GroundTruth","heat pump")])
+                    # here we compress the power,active multiindex of the sm into a tuple so we only need two indexes
+                    test_mains.columns = pd.MultiIndex.from_tuples([("SiteMeter","SiteMeter")])
+                    results_df = pd.concat([pred_df,self.gt_overall,test_mains],axis=1)
+                    with pd.HDFStore(self.results_store_name) as store:
+                        store[self.storing_key] = results_df
+                    pass
+
 
 
     def dropna(self,mains_df, appliance_dfs=[]):
@@ -318,7 +338,7 @@ class API():
         """
         
         pred_overall={}
-        gt_overall={}           
+        gt_overall= pd.DataFrame()          # this is meaningless gt is common for classifiers on a given dataset (maybe just to keep the lsp happy?)
         for name,clf in classifiers:
             gt_overall,pred_overall[name]=self.predict(clf,self.test_mains,self.test_submeters, self.sample_period, timezone)
 
